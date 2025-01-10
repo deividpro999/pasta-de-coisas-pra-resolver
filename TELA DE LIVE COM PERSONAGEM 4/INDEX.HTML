@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Avatar com Movimentos</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Estilos para o chat */
+    .chat-container {
+      width: 30%;
+      background-color: rgba(241, 241, 241, 0.5); /* Transparente */
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      z-index: 2;
+    }
+
+    .chat-box {
+      flex-grow: 1;
+      background-color: rgba(255, 255, 255, 0.7); /* Transparente */
+      border: 1px solid #ccc;
+      margin-bottom: 10px;
+      overflow-y: auto;
+      padding: 10px;
+    }
+
+    #message-input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      margin-bottom: 10px;
+    }
+
+    #send-button {
+      padding: 10px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #send-button:hover {
+      background-color: #0056b3;
+    }
+
+    /* Estilos para a live e o personagem */
+    .live-container {
+      width: 70%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      background-color: #e9ecef;
+      background-image: url("Captura de Tela (391).png");
+      background-size: cover;
+      background-position: center;
+      overflow: hidden;
+    }
+
+    #avatar {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      z-index: 2;
+      transition: transform 1s;
+    }
+
+    #floor {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      height: 300px;
+      background-image: url("Fundo De Grama PNG.jpg");
+      background-color: #3e3e3e;
+      background-size: cover;
+      background-position: center;
+      z-index: 1;
+    }
+
+    #video {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="chat-container">
+    <div class="chat-box" id="chat-box"></div>
+    <input type="text" id="message-input" placeholder="Digite sua mensagem...">
+    <button id="send-button">Enviar</button>
+  </div>
+  <div class="live-container">
+    <canvas class="output_canvas" width="640px" height="480px"></canvas>
+    <img id="avatar" src="seu-avatar.png" alt="Avatar">
+    <div id="floor"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+
+<script>
+  const videoElement = document.createElement('video');
+  const canvasElement = document.querySelector('.output_canvas');
+  const canvasCtx = canvasElement.getContext('2d');
+  let lastX = 0;
+  let lastY = 0;
+  let faceDetected = false;
+
+  function onResults(results) {
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+      faceDetected = true;
+      const face = results.multiFaceLandmarks[0];
+      const x = face[1].x * canvasElement.width;
+      const y = face[1].y * canvasElement.height;
+      const avatarElement = document.getElementById('avatar');
+      avatarElement.style.transform = `translate(${x}px, ${y}px)`;
+      lastX = x;
+      lastY = y;
+    } else {
+      faceDetected = false;
+    }
+
+    canvasCtx.restore();
+  }
+
+  function moveAvatarOffScreen() {
+    if (!faceDetected) {
+      const avatarElement = document.getElementById('avatar');
+      const screenWidth = window.innerWidth;
+
+      if (lastX > screenWidth / 2) {
+        avatarElement.style.transform = `translate(${screenWidth}px, ${lastY}px)`;
+      } else {
+        avatarElement.style.transform = `translate(-200px, ${lastY}px)`;
+      }
+    }
+  }
+
+  const faceMesh = new FaceMesh({locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+  }});
+  faceMesh.setOptions({
+    maxNumFaces: 1,
+    refineLandmarks: true,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
+  faceMesh.onResults(onResults);
+
+  const camera = new Camera(videoElement, {
+    onFrame: async () => {
+      await faceMesh.send({image: videoElement});
+      moveAvatarOffScreen();
+    },
+    width: 640,
+    height: 480
+  });
+  camera.start();
+</script>
+
+</body>
+</html>
